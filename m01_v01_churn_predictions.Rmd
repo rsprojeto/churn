@@ -11,11 +11,64 @@ output:
 knitr::opts_chunk$set(echo = TRUE, warning = F, message = F, fig.width = 13, fig.height = 8)
 ```
 
+# Company
+
+### The TopBank Company:
+
+A banking services company, with customers mainly in Europe.    
+Offers financial products such as bank account, investments and insurance.    
+Business Model: banking service through physical and online branches.  
+Main product: bank account free of charge, valid for 12 months. After that period, the account must be renewed.  
+Bank account revenue per customer:  
+  
+  - 15% of the client's estimated salary, for clients with estimated income below the average.  
+  - 20% of the client's estimated salary, for clients with estimated income above the average.  
+
+### Problem:  
+
+  - The rate of customer cancellation has increased significantly in recent months.  
+  - A taxa de cancelamento de clientes aumentou significativamente nos últimos meses.  
+
+### goal:  
+
+  - Reduce customer churn, that is, prevent the customer from canceling the contract and not renewing it for       another 12 months. 
+  - Reduzir o churn de clientes, ou seja, evitar que o cliente cancele o contrato e não o renove por mais 12 meses.  
+
+### Deliverable:  
+
+Model performance and results report with the following topics:    
+  
+  - What is the company's current turnover rate? 
+  - Qual é a taxa de rotatividade atual da empresa?
+  
+  - How does the churn rate vary by month?  
+  - Como a taxa de churn varia por mês?  
+  
+  - How does the model perform to label customers as churns? 
+  - Qual é o desempenho do modelo para prever os clientes como churns?  
+  
+  - - What is the company's revenue, if it prevents customers from entering the contract without canceling it using the model developed?    
+  - Qual é a receita da empresa, se ela evita-se que os clientes entrem no cancela-sem o contrato por meio do modelo desenvolvido?  
+
+Action Plan: 
+
+  1. Offer a discount coupon or other financial incentive.  
+  2. Which customers could receive the incentive and at what cost, in order to maximize ROI (Return on Investment)?     
+  (the sum of the incentives must not exceed $ 10,000.00.)      
+  
+Plano de Ação : 
+  
+  1. Oferecer cupom de desconto ou outro incentivo financeiro.  
+  2. Quais clientes poderiam receber o incentivo e a que custo, a fim de maximizar o ROI (Return on        Investment)?      
+  (a soma dos incentivos não deve exceder $ 10.000,00.)    
+
+
 # Importing Needed packages
 
 ```{r}
 
 library(dplyr)
+library(data.table)
 
 ```
 
@@ -25,7 +78,7 @@ library(dplyr)
 
 ```{r}
 
-data_raw <- data.table::fread("/home/renato/repos/Churn/data/churn.xls")
+data_raw <- data.table::fread("/home/renato/repos/churn/data/churn.xls")
 
 ```
 
@@ -205,7 +258,8 @@ data_raw %>%
 
 ```
 
-
+The company's current cancellation rate is 20%.  
+A taxa de cancelamento atual da empresa é de 20%.  
 
 
 ### Categorical Attributes
@@ -302,13 +356,5 @@ num_attributes %>%
 
 ```
 
-
-
-
-
-
-
-
-# Feature Engineering
 
 
