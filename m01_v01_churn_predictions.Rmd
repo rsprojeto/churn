@@ -74,6 +74,27 @@ library(data.table)
 
 ## Helper Functions
 
+```{r}
+
+feature_engineering <- function(df){
+  
+  df <- df %>% dplyr::mutate(tenure_year = tenure + 1,
+                             age_ten_year = age / tenure_year,
+                             cred_ten_year = credit_score / tenure_year,
+                             cred_age = credit_score / age,
+                             amount = estimated_salary + balance,
+                             amount_credit = amount / credit_score,
+                             amount_ten_year = amount /tenure_year,
+                             amount_prod = amount / num_of_products,
+                             cred_prod = credit_score / num_of_products,
+                             bal_ten_year = balance / tenure_year,
+                             prod_m_cr = num_of_products - has_cr_card,
+                             prod_t_cr = num_of_products * has_cr_card)
+}
+
+```
+
+
 ## Reading the data
 
 ```{r}
@@ -355,6 +376,104 @@ num_attributes %>%
   
 
 ```
+# Feature Engineering
 
+## Mind Map
+
+```{r, out.width = '100%'}
+
+knitr::include_graphics("/home/renato/repos/churn/img/Churn.png")
+
+```
+
+### Customers Hypotheses
+
+**1** Customers with higher wages should have a higher churn rate.  
+**1** Clientes com salarios mais altos, devem ter um indice de churn maior.  
+
+**2** Customers with a low level of satisfaction are more likely to churn.  
+**2** Clientes com um nivel de satisfação baixo , tendem mais a churn.  
+
+**3** Customers with a low bank account balance are more likely to churn.  
+**3** Clientes com saldo em conta bancária baixo tendem mais a churn. 
+
+**4** Younger customers must cancel services more.  
+**4** Clientes mais novos devem cancelar mais os serviçõs.  
+
+### Gender Hypotheses
+
+**1** Male customers are more likely to churn.    
+**1** Clientes do sexo masculino tendem mais a churn.  
+
+### Temporal
+
+**1** The greater the number of active years the customer has, the lower the risk of churn.  
+**1** Quanto maior o numero de anos ativo o cliente tem, menor é risco de churn.  
+
+### Geographi
+
+**1** Churn rate should be higher for clients from French.  
+**1** O churn rate deve ser maior para clientes da França.
+
+### Products
+
+**1** The more products the customer has, the less risk of churn.  
+**1** Quanto mais produtos o cliente possui, menor é risco de churn.  
+
+### Final Hypothesis List
+
+**1** Customers with higher wages should have a higher churn rate.  
+**1** Clientes com salarios mais altos, devem ter um indice de churn maior. 
+
+**2** Customers with a low level of satisfaction are more likely to churn.  
+**2** Clientes com um nivel de satisfação baixo , tendem mais a churn.  
+
+**3** Customers with a low bank account balance are more likely to churn.  
+**3** Clientes com saldo em conta bancária baixo tendem mais a churn. 
+
+**4** Younger customers must cancel services more.  
+**4** Clientes mais novos devem cancelar mais os serviçõs.  
+
+
+**5** Male customers are more likely to churn.    
+**5** Clientes do sexo masculino tendem mais a churn.  
+
+
+**6** The greater the number of active years the customer has, the lower the risk of churn.  
+**6** Quanto maior o numero de anos ativo o cliente tem, menor é risco de churn.  
+
+
+**7** Churn rate should be higher for clients from French.  
+**7** O churn rate deve ser maior para clientes da França.
+
+
+**8** The more products the customer has, the less risk of churn.  
+**8** Quanto mais produtos o cliente possui, menor é risco de churn.
+
+
+```{r}
+
+df1 <- data_raw
+
+head(df1) %>% knitr::kable() %>% 
+  kableExtra::kable_styling(full_width = F, bootstrap_options = c("striped", "hover", "condesend", "responsive"),html_font = "Cambria")
+
+```
+
+```{r}
+
+# Create new features
+df1 <- feature_engineering(df1)
+
+```
+
+
+```{r}
+
+# Visualize news features
+t(head(df1)) %>% knitr::kable() %>% 
+  kableExtra::kable_styling(full_width = F, bootstrap_options = c("striped", "hover", "condesend", "responsive"),html_font = "Cambria")
+
+```
 
 
