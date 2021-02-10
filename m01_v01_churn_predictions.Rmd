@@ -1,0 +1,314 @@
+---
+title: "m01_v01_churn_predictions"
+output: 
+    html_document:
+        number_sections: true
+        #toc: TRUE
+        #toc_float: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F, fig.width = 13, fig.height = 8)
+```
+
+# Importing Needed packages
+
+```{r}
+
+library(dplyr)
+
+```
+
+## Helper Functions
+
+## Reading the data
+
+```{r}
+
+data_raw <- data.table::fread("/home/renato/repos/Churn/data/churn.xls")
+
+```
+
+# Descricption of Data
+
+## Rename Columns
+
+```{r}
+
+data_raw <- data_raw %>% janitor::clean_names() 
+
+head(data_raw)
+
+```
+## Features Description
+
+**RowNumber -** The number of the row.  
+**RowNumber -** O numero de linhas.  
+
+**CustomerID -** Customer's unique identifier.  
+**CustomerID -** Identificador único do cliente.  
+
+**Surname -** Customer's surname.  
+**Surname -** Sobrenome do Cliente.  
+
+**CreditScore -** Customer's credit score for the consumer market.  
+**CreditScore -** Pontuação de crédito do cliente para o mercado consumidor.  
+
+**Geography -** The country where the customer lives.  
+**Geography -** O país onde o cliente mora.  
+
+**Gender -** Customer's gender.  
+**Gender -** Sexo do Cliente.  
+
+**Age -** Customer's age.  
+**Age -** Idade do Cliente.  
+
+**Tenure -** Number of years that the customer was active.  
+**Tenure -** O numero de anos que Cliente esteve ativo.  
+
+**Balance -** The amount that the customer has in the bank account.  
+**Balance -** Saldo da Conta bancaria.  
+
+**NumOfProducts -** The number of products bought by the customer.  
+**NumOfProducts -** O número de produtos comprados pelo cliente.  
+
+**HasCrCard -** Flag that indicates if the customer has a credit card.  
+**HasCrCard -** Se o cliente possui cartão de credito.  
+
+**IsActiveMember -** Flag that indicates if the customer has done a bank activity in the last 12 months.  
+**IsActiveMember -** Sinalizador que indica se o cliente realizou uma atividade bancária nos últimos 12 meses.  
+
+**EstimateSalary -** Estimate customer's monthly income.  
+**EstimateSalary -** Estimativa de renda mensal do Cliente.  
+
+**Exited -** Flag that indicates if the customer is in Churn.  
+**Exited -** Indica se cliente cancelou ou nao o contrato.  
+
+
+## Data Dimensions
+
+```{r}
+
+print(paste("Number of Rows: " ,nrow(data_raw)))
+print(paste("Number of Cols: " ,ncol(data_raw)))
+
+```
+
+## Data Types
+
+```{r}
+
+glimpse(data_raw)
+
+```
+
+## Checking NA
+
+```{r}
+
+colSums(is.na(data_raw))
+
+```
+
+- The data set has no missing values.  
+- O conjunto de dados não possui valores ausentes.  
+
+## Change Types
+
+```{r}
+
+data_raw <- data_raw %>% 
+  dplyr::mutate_if(is.character, as.factor)
+
+```
+
+## Descriptive Statistics
+
+```{r}
+
+# selecting only numeric features
+num_attributes <- data_raw %>% 
+  purrr::keep(is.numeric)
+
+# selecting only categorical features
+cat_attributes <- data_raw %>% 
+  purrr::keep(is.factor)
+
+```
+
+### Numeric Attributes
+
+```{r}
+
+# Central Tendency  - mean , median
+num_mean <- as.data.frame( t(lapply(num_attributes, mean)))
+
+num_median <- as.data.frame( t(lapply(num_attributes, median)))
+
+# dispersion - std, min, max, range, skew, kurtosis
+num_std <- as.data.frame( t(lapply(num_attributes, sd)))
+
+num_min <- as.data.frame( t(lapply(num_attributes, min)))
+
+num_max <- as.data.frame( t(lapply(num_attributes, max)))
+
+num_skew <- as.data.frame( t(lapply(num_attributes, e1071::skewness)))
+
+num_kurt <- as.data.frame( t(lapply(num_attributes, e1071::kurtosis)))
+
+table_desc <- t(bind_rows(num_min,num_max,num_mean,num_median,num_std,num_skew,num_kurt))
+
+table_desc<- as.data.frame(table_desc)
+
+names(table_desc) <- c("min","max","mean","median","std","skew", "kurtosis")
+
+knitr::kable(table_desc, digits = 4) %>% 
+  kableExtra::kable_styling(full_width = F, bootstrap_options = c("striped", "hover", "condesend", "responsive"),html_font = "Cambria")
+
+```
+
+```{r, fig.height= 10}
+
+num_attributes %>%
+  purrr::keep(is.numeric) %>% 
+  tidyr::gather() %>% 
+  ggplot2::ggplot(ggplot2::aes(value)) +
+    ggplot2::facet_wrap(~ key, scales = "free") +
+    ggplot2::geom_histogram(col= "black", fill="steelblue", bins = 25)+
+    ggplot2::scale_y_continuous(labels = function(x) format(x, scientific = FALSE))+
+  ggplot2::labs(title = "Distribution of numerical variables")+
+  ggplot2::scale_x_continuous(labels = function(x) format(x, scientific = FALSE))+
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, size = 18))
+
+```
+  
+
+
+```{r}
+
+data_raw %>%
+  mutate(exited = as.factor(exited)) %>% 
+  dplyr::count(exited) %>% 
+  mutate(prop = round(n/sum(n)*100,2)) %>% 
+  ggplot2::ggplot(ggplot2::aes(x = exited, y = prop, color = exited)) +
+  ggsci::scale_color_jco() +
+  ggplot2::geom_segment(ggplot2::aes(xend = exited, yend = 0), show.legend = F) +
+  ggplot2::geom_point(ggplot2::aes(size = prop), show.legend = F) +
+  ggplot2::geom_label(ggplot2::aes(label = paste0(prop,"% / n = ",n)),
+             fill = "white", 
+             hjust = "inward",
+             show.legend = F) +
+  ggplot2::labs(y = "%",
+       x = "Exited") +
+  ggplot2::coord_flip() +
+  ggplot2::theme_minimal()
+
+```
+
+
+
+
+### Categorical Attributes
+
+```{r}
+
+apply(cat_attributes, 2, function(x) length(unique(x)))
+
+```
+
+```{r}
+
+ggpubr::ggarrange(
+data_raw %>%
+  dplyr::count(gender) %>% 
+  mutate(prop = round(n/sum(n)*100,2)) %>% 
+  ggplot2::ggplot(ggplot2::aes(x = gender, y = prop, color = gender)) +
+  ggsci::scale_color_jco() +
+  ggplot2::geom_segment(ggplot2::aes(xend = gender, yend = 0), show.legend = F) +
+  ggplot2::geom_point(ggplot2::aes(size = prop), show.legend = F) +
+  ggplot2::geom_label(ggplot2::aes(label = paste0(prop,"% / n = ",n)),
+             fill = "white", 
+             hjust = "inward",
+             show.legend = F) +
+  ggplot2::labs(y = "%",
+       x = "Gender", title = "Gender") +
+  ggplot2::coord_flip() +
+  ggplot2::theme_minimal()+
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, size = 18)),
+
+data_raw %>%
+  dplyr::count(geography) %>% 
+  mutate(prop = round(n/sum(n)*100,2)) %>% 
+  ggplot2::ggplot(ggplot2::aes(x = geography, y = prop, color = geography)) +
+  ggsci::scale_color_jco() +
+  ggplot2::geom_segment(ggplot2::aes(xend = geography, yend = 0), show.legend = F) +
+  ggplot2::geom_point(ggplot2::aes(size = prop), show.legend = F) +
+  ggplot2::geom_label(ggplot2::aes(label = paste0(prop,"% / n = ",n)),
+             fill = "white", 
+             hjust = "inward",
+             show.legend = F) +
+  ggplot2::labs(y = "%",
+       x = "Geography", title = "Geography") +
+  ggplot2::coord_flip() +
+  ggplot2::theme_minimal()+
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, size = 18)),
+
+ncol = 2)
+
+```
+
+Conclusions:  
+Conclusões:  
+
+- The average age of customers is 38 years.  
+- A média de idade dos clientes esta em 38 anos.  
+
+- Balance has an almost normal distribution, with most customers between 100,000.00 and 130,000.00 euros in their bank account.  
+- Balance possui uma distribuição quase normal, tendo na sua maioria clientes entre 100,000.00  a 130,000.00 euros em sua conta bancaria.  
+
+- Most customers have an average score of 400 to 700.  
+- A maioria dos clientes possui um score médio de 400 a 700.  
+
+- Customers have an average of 100,000.00 euros per month.  
+- Os clientes possuem em média 100,000.00 euros por mês.  
+
+- Most customers have a credit card.  
+- A maioria do clientes possui cartão de credito.  
+
+- Customers who have and have not done banking in the past 12 months are almost balanced.  
+- Os clientes que realizaram e nao realizaram um operação bancaria no ultimos 12 meses é quase equilibrado.  
+
+- Most customers own at least one bank product.  
+- A maioria dos clientes possuem pelo menos um produto do banco.  
+
+- The average number of customers who are active in the bank is 5 years.  
+- A média de clientes que estão ativos no banco é de 5 anos.
+
+- Only 20% is healthy churn.  
+- Apenas 20% é são churn.  
+
+- 55% of customers are male.  
+- 55% dos clientes são masculino.  
+
+- 50% of customers are from France.  
+- 50% dos clientes são da frança.  
+
+```{r}
+
+num_attributes %>% 
+  filter(balance == 0) %>% 
+  count()
+  
+
+```
+
+
+
+
+
+
+
+
+# Feature Engineering
+
+
