@@ -8,7 +8,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = F, message = F, fig.width = 13, fig.height = 8, comment = "")
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F, fig.width = 13, fig.height = 6, comment = "")
 ```
 
 # Company
@@ -39,7 +39,7 @@ Bank account revenue per customer:
 Model performance and results report with the following topics:    
   
   - What is the company's current turnover rate? 
-  - Qual é a taxa de rotatividade atual da empresa?
+  - Qual é a taxa de churn atual da empresa?
   
   - How does the churn rate vary by month?  
   - Como a taxa de churn varia por mês?  
@@ -48,7 +48,7 @@ Model performance and results report with the following topics:
   - Qual é o desempenho do modelo para prever os clientes como churns?  
   
   - - What is the company's revenue, if it prevents customers from entering the contract without canceling it using the model developed?    
-  - Qual é a receita da empresa, se ela evita-se que os clientes entrem no cancela-sem o contrato por meio do modelo desenvolvido?  
+  - Qual é a receita da empresa, se ela evita-se que os clientes entrem e não cancela-sem o contrato por meio do modelo desenvolvido?  
 
 Action Plan: 
 
@@ -59,8 +59,8 @@ Action Plan:
 Plano de Ação : 
   
   1. Oferecer cupom de desconto ou outro incentivo financeiro.  
-  2. Quais clientes poderiam receber o incentivo e a que custo, a fim de maximizar o ROI (Return on        Investment)?      
-  (a soma dos incentivos não deve exceder $ 10.000,00.)    
+  2. Quais clientes poderiam receber o incentivo e a que custo, a fim de maximizar o ROI (Return on Investment)?      
+  (a soma dos incentivos não deve exceder $ 10.000,00).     
 
 
 # Importing Needed packages
@@ -129,11 +129,38 @@ robust_scaler <- function(x){
   
 }
 
-ml_error <-  function(model_name = "Logistic Regression Model",model_predictions){
+ml_error <-  function(model_name = "Linear Regression Model",model_predictions){
   Accuracy <- model_predictions %>%
+    yardstick::accuracy( actual,predictions)
+  
+  Precision <- model_predictions %>%
     yardstick::precision( actual,predictions)
-}
+  
+  Recall <- model_predictions %>%
+    yardstick::recall( actual,predictions)
 
+  F_meas <- model_predictions %>%
+    yardstick::f_meas( actual,predictions)
+  
+  MCC <- model_predictions %>%
+    yardstick::mcc( actual,predictions)
+
+  Kappa <- model_predictions %>%
+    yardstick::kap( actual, predictions)
+  
+  ROC_AUC <- model_predictions %>%
+    yardstick::roc_auc( actual, predictions)
+
+  data.frame(Model_Name = model_name, 
+             Accuracy   = round(Accuracy$.estimate,3), 
+             #Precision  = round(Precision$.estimate,3),
+             #Recall     = round(Recall$.estimate,3), 
+             F_meas     = round(F_meas$.estimate,3),
+             MCC        = round(MCC$.estimate,3),
+             Kappa      = round(Kappa$.estimate, 3),
+             )  
+  
+} 
 ```
 
 
@@ -154,6 +181,36 @@ data_raw <- data.table::fread("/home/renato/repos/churn/data/churn.xls")
 data_raw <- data_raw %>% janitor::clean_names() 
 
 head(data_raw)
+
+```
+## Creating Training and Test Dataset
+
+```{r}
+
+# Split data
+split <- initial_split(data_raw, prop =0.8, strata = exited)
+
+# Train dataset
+train <- training(split)
+
+# Testing daset
+test <- testing(split)
+
+# Save train dataset
+#write.csv(train, "/home/renato/repos/churn/data/train.csv", row.names = F)
+
+# Save testing dataset
+#write.csv(test, "/home/renato/repos/churn/data/test.csv", row.names = F)
+
+```
+
+## Loading new trainning dataset
+
+```{r}
+
+df1 <- data.table::fread("/home/renato/repos/churn/data/train.csv")
+
+head(df1)
 
 ```
 ## Features Description
@@ -205,8 +262,8 @@ head(data_raw)
 
 ```{r}
 
-print(paste("Number of Rows: " ,nrow(data_raw)))
-print(paste("Number of Cols: " ,ncol(data_raw)))
+print(paste("Number of Rows: " ,nrow(df1)))
+print(paste("Number of Cols: " ,ncol(df1)))
 
 ```
 
@@ -214,7 +271,7 @@ print(paste("Number of Cols: " ,ncol(data_raw)))
 
 ```{r}
 
-glimpse(data_raw)
+glimpse(df1)
 
 ```
 
@@ -222,7 +279,7 @@ glimpse(data_raw)
 
 ```{r}
 
-colSums(is.na(data_raw))
+colSums(is.na(df1))
 
 ```
 
@@ -233,7 +290,7 @@ colSums(is.na(data_raw))
 
 ```{r}
 
-data_raw <- data_raw %>% 
+df1 <- df1 %>% 
   dplyr::mutate_if(is.character, as.factor)
 
 ```
@@ -243,11 +300,11 @@ data_raw <- data_raw %>%
 ```{r}
 
 # selecting only numeric features
-num_attributes <- data_raw %>% 
+num_attributes <- df1 %>% 
   purrr::keep(is.numeric)
 
 # selecting only categorical features
-cat_attributes <- data_raw %>% 
+cat_attributes <- df1 %>% 
   purrr::keep(is.factor)
 
 ```
@@ -302,7 +359,7 @@ num_attributes %>%
 
 ```{r}
 
-data_raw %>%
+df1 %>%
   mutate(exited = as.factor(exited)) %>% 
   dplyr::count(exited) %>% 
   mutate(prop = round(n/sum(n)*100,2)) %>% 
@@ -315,9 +372,10 @@ data_raw %>%
              hjust = "inward",
              show.legend = F) +
   ggplot2::labs(y = "%",
-       x = "Exited") +
+       x = "Churn", title = "Rate by Churn") +
   ggplot2::coord_flip() +
-  ggplot2::theme_minimal()
+  ggplot2::theme_minimal()+
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, size = 18))
 
 ```
 
@@ -336,7 +394,7 @@ apply(cat_attributes, 2, function(x) length(unique(x)))
 ```{r}
 
 ggpubr::ggarrange(
-data_raw %>%
+df1 %>%
   dplyr::count(gender) %>% 
   mutate(prop = round(n/sum(n)*100,2)) %>% 
   ggplot2::ggplot(ggplot2::aes(x = gender, y = prop, color = gender)) +
@@ -353,7 +411,7 @@ data_raw %>%
   ggplot2::theme_minimal()+
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, size = 18)),
 
-data_raw %>%
+df1 %>%
   dplyr::count(geography) %>% 
   mutate(prop = round(n/sum(n)*100,2)) %>% 
   ggplot2::ggplot(ggplot2::aes(x = geography, y = prop, color = geography)) +
@@ -491,7 +549,7 @@ knitr::include_graphics("/home/renato/repos/churn/img/Churn.png")
 
 ```{r}
 
-df1 <- data_raw
+df2 <- df1
 
 head(df1) %>% knitr::kable() %>% 
   kableExtra::kable_styling(full_width = F, bootstrap_options = c("striped", "hover", "condesend", "responsive"),html_font = "Cambria")
@@ -501,7 +559,7 @@ head(df1) %>% knitr::kable() %>%
 ```{r}
 
 # Create new features
-df1 <- feature_engineering(df1)
+df2 <- feature_engineering(df2)
 
 ```
 
@@ -509,7 +567,7 @@ df1 <- feature_engineering(df1)
 ```{r}
 
 # Visualize news features
-t(head(df1)) %>% knitr::kable() %>% 
+t(head(df2)) %>% knitr::kable() %>% 
   kableExtra::kable_styling(full_width = F, bootstrap_options = c("striped", "hover", "condesend", "responsive"),html_font = "Cambria")
 
 ```
@@ -518,7 +576,7 @@ t(head(df1)) %>% knitr::kable() %>%
 
 ```{r}
 
-df2 <- df1
+df3 <- df2
 
 ```
 
@@ -528,7 +586,7 @@ df2 <- df1
 
 ```{r}
 
-df2 %>%
+df3 %>%
   mutate(exited = as.factor(exited)) %>% 
   dplyr::count(exited) %>% 
   mutate(prop = round(n/sum(n)*100,2)) %>% 
@@ -550,7 +608,7 @@ df2 %>%
 
 ```{r}
 
-df2 %>% 
+df3 %>% 
   ggplot(aes(exited))+
   geom_histogram(fill= "steelblue",col="black")+
   scale_x_continuous(breaks = seq(0,1))
@@ -580,7 +638,7 @@ num_attributes %>%
 ```{r}
 
 ggpubr::ggarrange(
-df2 %>%
+df3 %>%
   dplyr::count(gender) %>% 
   mutate(prop = round(n/sum(n)*100,2)) %>% 
   ggplot2::ggplot(ggplot2::aes(x = gender, y = prop, color = gender)) +
@@ -597,7 +655,7 @@ df2 %>%
   ggplot2::theme_minimal()+
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, size = 18)),
 
-df2 %>%
+df3 %>%
   dplyr::count(geography) %>% 
   mutate(prop = round(n/sum(n)*100,2)) %>% 
   ggplot2::ggplot(ggplot2::aes(x = geography, y = prop, color = geography)) +
@@ -615,14 +673,13 @@ df2 %>%
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5, size = 18)),
 
 ncol = 2)
-
 ```
 
 ## Bivariate Analysis
 
 ```{r, out.width = '100%', out.height= "100%"}
 
-df2 %>% 
+df3 %>% 
   group_by(tenure) %>% 
   summarise(exited = sum(exited), .groups = "drop") %>%
  highcharter::hchart(
@@ -634,7 +691,7 @@ df2 %>%
 
 ```{r}
 
-round(cor(df2$tenure, df2$exited),2)
+round(cor(df3$tenure, df3$exited),2)
 
 ```
 
@@ -653,7 +710,7 @@ Correlação fraca e negativa.
 
 ```{r, out.width = '100%', out.height= "100%"}
 
-fig.2 <- df2 %>% 
+fig.2 <- df3 %>% 
   mutate(exited = as.factor(exited)) %>% 
   ggplot(aes(estimated_salary, fill = exited))+
   geom_density(alpha = 0.3)+
@@ -668,7 +725,7 @@ ggplotly(fig.2) %>% layout(autosize = F, width = 900, height = 450)
 
 ```{r}
 
-round(cor(df2$estimated_salary, df2$exited),2)
+round(cor(df3$estimated_salary, df3$exited),2)
 
 ```
 
@@ -684,7 +741,7 @@ Correlação fraca e positiva.
 
 ```{r ,out.width = '100%', out.height= "100%"}
 
-fig.3 <- df2 %>% 
+fig.3 <- df3 %>% 
   mutate(exited = as.factor(exited)) %>% 
   ggplot(aes(balance, fill= exited))+
   geom_density(alpha= 0.3)+
@@ -698,7 +755,7 @@ ggplotly(fig.3) %>% layout(autosize = F, width = 900, height = 450)
 
 ```{r}
 
-round(cor(df2$balance, df2$exited),2)
+round(cor(df3$balance, df3$exited),2)
 
 ```
 
@@ -715,7 +772,7 @@ Correlação fraca e positiva.
 
 ```{r ,out.width = '100%', out.height= "100%"}
 
-fig.4 <- df2 %>% 
+fig.4 <- df3 %>% 
   mutate(exited = as.factor(exited)) %>% 
   ggplot(aes(age, fill= exited))+
   geom_density(alpha= 0.3)+
@@ -730,7 +787,7 @@ ggplotly(fig.4) %>% layout(autosize = F, width = 900, height = 450)
 
 ```{r}
 
-round(cor(df2$age, df2$exited),2)
+round(cor(df3$age, df3$exited),2)
 
 ```
 
@@ -747,7 +804,7 @@ Correlação fraca e positiva.
 
 ```{r ,out.width = '100%', out.height= "100%"}
 
-fig.5 <- df2 %>% 
+fig.5 <- df3 %>% 
   mutate(exited = as.factor(exited)) %>% 
   ggplot(aes(gender, fill= exited))+
   geom_bar(col = "black")+
@@ -763,7 +820,7 @@ Quantidade churn entre os sexos masculino e feminino.
 
 ```{r}
 
-table(df2$gender, df2$exited)
+table(df3$gender, df3$exited)
 
 ```
 
@@ -772,7 +829,7 @@ Proporção de churn entre os sexos masculino e feminino.
 
 ```{r}
 
-prop.table(table(df2$gender, df2$exited))*100
+prop.table(table(df3$gender, df3$exited))*100
 
 ```
 
@@ -784,7 +841,7 @@ prop.table(table(df2$gender, df2$exited))*100
 
 ```{r ,out.width = '100%', out.height= "100%"}
 
-fig.6 <- df2 %>% 
+fig.6 <- df3 %>% 
   mutate(exited = as.factor(exited),
          tenure = as.factor(tenure)) %>% 
   ggplot(aes(tenure, fill= exited))+
@@ -800,7 +857,7 @@ Proporção de churn ao longo dos anos para clientes ativos.
 
 ```{r}
 
-(prop.table(table(df2$tenure, df2$exited))*100) 
+(prop.table(table(df3$tenure, df3$exited))*100) 
 
 ```
 
@@ -813,7 +870,7 @@ Proporção de churn ao longo dos anos para clientes ativos.
 
 ```{r ,out.width = '100%', out.height= "100%"}
 
-fig.7 <- df2 %>% 
+fig.7 <- df3 %>% 
   mutate(exited = as.factor(exited)
         ) %>% 
   ggplot(aes(geography, fill= exited))+
@@ -829,7 +886,7 @@ Proporção de churn por Pais.
 
 ```{r}
 
-prop.table(table(df2$geography, df2$exited))*100
+prop.table(table(df3$geography, df3$exited))*100
 
 ```
 
@@ -842,7 +899,7 @@ prop.table(table(df2$geography, df2$exited))*100
 
 ```{r ,out.width = '100%', out.height= "100%"}
 
-fig.8 <- df2 %>% 
+fig.8 <- df3 %>% 
   mutate(exited = as.factor(exited)
         ) %>% 
   ggplot(aes(num_of_products, fill= exited))+
@@ -857,7 +914,7 @@ ggplotly(fig.8) %>% layout(autosize = F, width = 900, height = 450)
 
 ```{r}
 
-round(cor(df2$num_of_products, df2$exited),2)
+round(cor(df3$num_of_products, df3$exited),2)
 
 ```
 
@@ -870,7 +927,7 @@ Correlação fraca e negativa.
 
 ```{r, fig.height=10}
 
-df2 %>% 
+df3 %>% 
   purrr::keep(is.numeric) %>% 
   cor() %>% 
   ggcorrplot::ggcorrplot(hc.order = T,
@@ -888,7 +945,7 @@ df2 %>%
 
 ```{r}
 
-df2 %>%
+df3 %>%
   purrr::keep(is.factor) %>% 
   as.data.frame() %>% 
   catcor(type="cramer") %>% 
@@ -910,8 +967,8 @@ df2 %>%
 
 ```{r}
 
-df2 <- df2 %>% mutate(exited = ifelse(exited == 1, "yes","no"),
-                      exited= as.factor(exited))
+df4 <- df3 %>% 
+  mutate(exited = ifelse(exited == 1, "yes","no"))
 
 ```
 
@@ -921,10 +978,10 @@ df2 <- df2 %>% mutate(exited = ifelse(exited == 1, "yes","no"),
 set.seed(1234)
 
 # data division, where 80% is for training and 20% for testing.
-data_split <- rsample::initial_split(df2, prop = 0.8, strata = exited)
+data_split <- rsample::initial_split(df3, prop = 0.8, strata = exited)
 
 # getting dataset of training
-train_data <- rsample::training(data_split)
+train_data <- rsample::training(data_split) 
 
 # getting dataset of testing
 test_data <- rsample::testing(data_split)
@@ -961,7 +1018,7 @@ Checking if it has an outlier or not
 
 ```{r, fig.height=9}
 
-df2 %>% 
+df4 %>% 
   purrr::keep(is.integer) %>% select(-row_number, -customer_id, -is_active_member, - has_cr_card, -num_of_products) %>% 
   tidyr::gather() %>% 
   ggplot(aes(value)) +
@@ -992,7 +1049,7 @@ summary statistical
 # "bal_ten_year"      <- double
  
 
-df2 %>% 
+df4 %>% 
   purrr::keep(is.double) %>% summary()
 
 ```
@@ -1002,7 +1059,7 @@ Checking if it has an outlier or not
 
 ```{r, fig.height= 10}
 
-df2 %>% 
+df4 %>% 
   purrr::keep(is.double)%>% 
   tidyr::gather() %>% 
   ggplot(aes(value)) +
@@ -1021,7 +1078,7 @@ df2 %>%
 # "geography"         <- factor
 # "gender"            <- factor 
 # "exited"            <- factor
-df2 %>% purrr::keep(is.factor)%>% summary()
+df4 %>% purrr::keep(is.factor)%>% summary()
 
 ```
 
@@ -1057,35 +1114,6 @@ knitr::kable(table_rescaling) %>%
 
 ```
 
-```{r}
-
-rec_imbalanced <- recipes::recipe(exited ~. , train_data %>% select(-surname)) %>%
-  
-  # Removing the features, row_number, customer_id and surname.
-  recipes::step_rm(row_number, customer_id) %>% 
-  
-  # normalizing features
-  recipes::step_mutate(age = robust_scaler(age)) %>% 
-  recipes::step_mutate(credit_score = robust_scaler(credit_score)) %>% 
-  recipes::step_mutate(prod_m_cr = robust_scaler(prod_m_cr)) %>% 
-  recipes::step_mutate(prod_t_cr= minmax_scaler(prod_t_cr)) %>% 
-  recipes::step_mutate(tenure = minmax_scaler(tenure)) %>% 
-  recipes::step_mutate(age_ten_year = robust_scaler(age_ten_year)) %>% 
-  recipes::step_mutate(amount = minmax_scaler(amount)) %>% 
-  recipes::step_mutate(amount_credit = robust_scaler(amount_credit)) %>% 
-  recipes::step_mutate(amount_prod = robust_scaler(amount_prod)) %>% 
-  recipes::step_mutate(amount_ten_year = robust_scaler(amount_ten_year)) %>% 
-  recipes::step_mutate(bal_ten_year = robust_scaler(bal_ten_year)) %>% 
-  recipes::step_mutate(balance = minmax_scaler(balance)) %>% 
-  recipes::step_mutate(cred_age = robust_scaler(cred_age)) %>% 
-  recipes::step_mutate(cred_prod = minmax_scaler(cred_prod)) %>% 
-  recipes::step_mutate(cred_ten_year = robust_scaler(cred_ten_year)) %>% 
-  recipes::step_mutate(estimated_salary = minmax_scaler(estimated_salary)) %>% 
-  recipes::step_mutate(tenure_year = minmax_scaler(tenure_year)) %>% 
-  # turning categorical features into numerics.
-  recipes::step_dummy(recipes::all_nominal(),- recipes::all_outcomes(), one_hot = T) 
-  
-```
 
 
 ```{r}
@@ -1113,6 +1141,8 @@ rec_balanced <- recipes::recipe(exited ~. , train_data %>% select(-surname)) %>%
   recipes::step_mutate(cred_ten_year = robust_scaler(cred_ten_year)) %>% 
   recipes::step_mutate(estimated_salary = minmax_scaler(estimated_salary)) %>% 
   recipes::step_mutate(tenure_year = minmax_scaler(tenure_year)) %>% 
+  recipes::step_mutate(exited= as.factor(exited),
+                      exited = forcats::fct_rev(exited)) %>% 
   # turning categorical features into numerics.
   recipes::step_dummy(recipes::all_nominal(),- recipes::all_outcomes(), one_hot = T) %>% 
   themis::step_smote(exited)
@@ -1121,12 +1151,6 @@ rec_balanced <- recipes::recipe(exited ~. , train_data %>% select(-surname)) %>%
 
 
 ```{r}
-
-# Imbalanced and pre-processed training data
-train_data_imbalanced <- rec_imbalanced %>% recipes::prep(train_data) %>% juice()
-
-# Imbalanced and pre-processed testing data
-test_data_imbalanced <- rec_imbalanced %>% recipes::prep(test_data) %>% juice()
 
 # Balanced and pre-processed training data
 train_data_balanced <- rec_balanced %>% recipes::prep(train_data) %>% juice()
@@ -1139,24 +1163,17 @@ test_data_balanced <- rec_balanced %>% recipes::prep(test_data) %>% juice()
 
 ```{r}
 
-ggpubr::ggarrange(
-train_data_imbalanced %>% 
-  ggplot(aes(exited, fill= exited))+
-  geom_bar(col="black")+
-  labs(title = "Imbalanced Data")+
-  theme(plot.title = element_text(hjust = 0.5, size = 18)), 
-
 train_data_balanced %>% 
   ggplot(aes(exited, fill= exited))+
   geom_bar(col="black")+
   labs(title = "Balanced Data")+
-  theme(plot.title = element_text(hjust = 0.5, size = 18)) , ncol = 2)
+  theme(plot.title = element_text(hjust = 0.5, size = 18)) 
 
 ```
 
 ```{r}
 
-train_data_imbalanced %>%
+train_data_balanced %>%
   purrr::keep(is.numeric) %>% 
   tidyr::gather() %>% 
   ggplot2::ggplot(ggplot2::aes(value)) +
@@ -1226,20 +1243,28 @@ lr <- logistic_reg() %>%
   set_engine("glm") 
 
 # Trainnig model
-lr_fit <- lr %>% fit(exited ~., data= train_data_imbalanced)
+lr_fit <- lr %>% fit(exited ~., data= train_data_balanced, )
 
-lr_wf <- workflow() %>% 
-  add_model(lr) %>% 
-  add_recipe(rec_imbalanced)
+lr_pred <- lr_fit %>% 
+  predict(test_data_balanced) %>%
+  bind_cols(test_data_balanced$exited) %>%
+  rename(predictions = ".pred_class", actual = "...2")
 
-lr_res <- 
-  last_fit(
-    lr_wf,
-    split = data_split,
-    metrics = metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap)
-  )
 
-lr_result <- data.frame(t(collect_metrics(lr_res) %>% select(.metric, .estimate)))
+lr_pred_prob <- lr_fit %>% 
+  predict(test_data_balanced, type = "prob") %>%
+  bind_cols(test_data_balanced$exited) %>%
+  rename( actual = "...3")
+
+m_eval <- metric_set(accuracy,precision,recall, f_meas,mcc,kap)
+
+lr_result <- m_eval(bind_cols(test_data_balanced, lr_pred), truth = actual, estimate = predictions) 
+
+lr_roc <- roc_auc(bind_cols(test_data_balanced, lr_pred_prob), truth = actual, .pred_1)
+
+lr_result <- bind_rows(lr_result, lr_roc)
+
+lr_result <- data.frame(t(lr_result %>% select(.metric, .estimate)))
 
 rownames(lr_result) <- NULL
 
@@ -1247,9 +1272,9 @@ colnames(lr_result) <- lr_result[1,]
 
 lr_result <- lr_result[-1, ]
 
-lr_result <- data.frame(Model = "Logistic Regression - Imbalanced", lr_result)
+lr_result <- data.frame(Model = "Logistic Regression", lr_result)
 
-lr_result %>% knitr::kable(caption = "Table Metrics Single - Imbalanced") %>% 
+lr_result %>% knitr::kable(caption = "Table Metrics Single") %>%
   kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
 
 
@@ -1259,15 +1284,26 @@ lr_result %>% knitr::kable(caption = "Table Metrics Single - Imbalanced") %>%
 
 ```{r}
 
-#lr_fit_cv <- lr_wf %>% 
-#  fit_resamples(cv, metrics=metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap),
-#                control = control_resamples(save_pred = T))
 
-#saveRDS(lr_fit_cv, "Models/lr_fit_cv.rds")
 
-lr_fit_cv <- readRDS("Models/lr_fit_cv.rds")
+# Create Workflow
+lr_wf <- 
+  workflow() %>% 
+  add_model(lr) %>% 
+  add_recipe(rec_balanced)
 
-lr_result_cv <- data.frame(t(collect_metrics(lr_fit_cv) %>% select(.metric, mean)))
+# Evaluate Cross validation
+lr_cv <-
+  fit_resamples(lr_wf,
+                resamples = cv,metrics = metric_set(accuracy,precision,recall, f_meas,mcc,kap, roc_auc), control = control_resamples(save_pred = TRUE))
+
+lr_cv %>% 
+  collect_metrics()
+#saveRDS(lr_cv, "Models/lr_cv.rds")
+
+lr_cv <- readRDS("Models/lr_cv.rds")
+
+lr_result_cv <- data.frame(t(collect_metrics(lr_cv) %>% select(.metric, mean)))
 
 rownames(lr_result_cv) <- NULL
 
@@ -1275,9 +1311,9 @@ colnames(lr_result_cv) <- lr_result_cv[1,]
 
 lr_result_cv <- lr_result_cv[-1, ]
 
-lr_result_cv <- data.frame(Model = "Logistic Regression -  Imbalanced", lr_result_cv)
+lr_result_cv <- data.frame(Model = "Logistic Regression", lr_result_cv)
 
-lr_result_cv %>% knitr::kable(caption = "Table Metrics Cross Validation - Imbalanced") %>% 
+lr_result_cv %>% knitr::kable(caption = "Table Metrics Cross Validation") %>%
   kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
 
 ```
@@ -1286,10 +1322,10 @@ lr_result_cv %>% knitr::kable(caption = "Table Metrics Cross Validation - Imbala
 
 ```{r}
 
- lr_fit_cv %>%
+ lr_cv %>%
    unnest(.predictions) %>%
    conf_mat(exited, .pred_class) %>% 
-  autoplot(type = "heatmap")
+   autoplot(type = "heatmap")
 
 ```
 
@@ -1302,40 +1338,46 @@ rf <- rand_forest(trees = 500) %>%
   set_engine("ranger") %>% 
   set_mode("classification")
 
+
 # Trainnig model
-#rf_fit <- rf %>% fit(exited ~., data= train_data_imbalanced)
+#rf_fit <- rf %>% fit(exited ~., data= train_data_balanced)
 
 #saveRDS(rf_fit, "Models/rf_fit.rds")
 
 rf_fit <- readRDS("Models/rf_fit.rds")
 
-rf_wf <- workflow() %>% 
-  add_model(rf) %>% 
-  add_recipe(rec_imbalanced)
+rf_pred <- rf_fit %>% 
+  predict(test_data_balanced) %>%
+  bind_cols(test_data_balanced$exited) %>%
+  rename(predictions = ".pred_class", actual = "...2")
 
-# rf_res <- 
-#   last_fit(
-#     rf_wf,
-#     split = data_split,
-#     metrics = metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap)
-#   )
 
-#saveRDS(rf_res,"Models/rf_res.rds")
+rf_pred_prob <- rf_fit %>% 
+  predict(test_data_balanced, type = "prob") %>%
+  bind_cols(test_data_balanced$exited) %>%
+  rename( actual = "...3")
 
-rf_res <- readRDS("Models/rf_res.rds")
+m_eval <- metric_set(accuracy,precision,recall, f_meas,mcc,kap)
 
-rf_result <- data.frame(t(collect_metrics(rf_res) %>% select(.metric, .estimate)))
+rf_result <- m_eval(bind_cols(test_data_balanced, rf_pred), truth = actual, estimate = predictions) 
+
+rf_roc <- roc_auc(bind_cols(test_data_balanced, rf_pred_prob), truth = actual, .pred_1)
+
+rf_result <- bind_rows(rf_result, rf_roc)
+
+rf_result <- data.frame(t(rf_result %>% select(.metric, .estimate)))
 
 rownames(rf_result) <- NULL
 
 colnames(rf_result) <- rf_result[1,]
 
-rf_result <- rf_result[-1, ] 
+rf_result <- rf_result[-1, ]
 
-rf_result <- data.frame(Model = "Random Forest -  Imbalanced", rf_result)
+rf_result <- data.frame(Model = "Random Forest", rf_result)
 
-rf_result %>% knitr::kable(caption = "Table Metrics Single - Imbalanced") %>% 
+rf_result %>% knitr::kable(caption = "Table Metrics Single") %>%
   kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
+
 
 ```
 
@@ -1343,15 +1385,22 @@ rf_result %>% knitr::kable(caption = "Table Metrics Single - Imbalanced") %>%
 
 ```{r}
 
-# rf_fit_cv <- rf_wf %>% 
-#   fit_resamples(cv, metrics=metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap),
-#                 control = control_resamples(save_pred = T))
+# Create Workflow
+rf_wf <- 
+  workflow() %>% 
+  add_model(rf) %>% 
+  add_recipe(rec_balanced)
 
-#saveRDS(rf_fit_cv, "Models/rf_fit_cv.rds")
+# Evaluate Cross validation
+# rf_cv <-
+#   fit_resamples(rf_wf,
+#                 resamples = cv,metrics = metric_set(accuracy,precision,recall, f_meas,mcc,kap, roc_auc), control = control_resamples(save_pred = TRUE))
 
-rf_fit_cv <- readRDS("Models/rf_fit_cv.rds")
+#saveRDS(rf_cv, "Models/rf_cv.rds")
 
-rf_result_cv <- data.frame(t(collect_metrics(rf_fit_cv) %>% select(.metric, mean)))
+rf_cv <- readRDS("Models/rf_cv.rds")
+
+rf_result_cv <- data.frame(t(collect_metrics(rf_cv) %>% select(.metric, mean)))
 
 rownames(rf_result_cv) <- NULL
 
@@ -1359,9 +1408,9 @@ colnames(rf_result_cv) <- rf_result_cv[1,]
 
 rf_result_cv <- rf_result_cv[-1, ]
 
-rf_result_cv <- data.frame(Model = "Random Forest -  Imbalanced", rf_result_cv)
+rf_result_cv <- data.frame(Model = "Random Forest", rf_result_cv)
 
-rf_result_cv %>% knitr::kable(caption = "Table Metrics Cross Validation - Imbalanced") %>% 
+rf_result_cv %>% knitr::kable(caption = "Table Metrics Cross Validation") %>%
   kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
 
 ```
@@ -1370,177 +1419,14 @@ rf_result_cv %>% knitr::kable(caption = "Table Metrics Cross Validation - Imbala
 
 ```{r}
 
- rf_fit_cv %>%
+ rf_cv %>%
    unnest(.predictions) %>%
    conf_mat(exited, .pred_class) %>% 
   autoplot(type = "heatmap")
 
 ```
 
-
-## Logistic Regression Model 
-
-### balanced Data
-
-```{r}
-
-# Creating model 
-lr_bal <- logistic_reg() %>%
-  set_engine("glm") 
-
-# Trainnig model
-lr_fit_bal <- lr_bal %>% fit(exited ~., data= train_data_balanced)
-
-lr_wf_bal <- workflow() %>% 
-  add_model(lr_bal) %>% 
-  add_recipe(rec_balanced)
-
-lr_res_bal <- 
-  last_fit(
-    lr_wf_bal,
-    split = data_split,
-    metrics = metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap)
-  )
-
-lr_result_bal <- data.frame(t(collect_metrics(lr_res_bal) %>% select(.metric, .estimate)))
-
-rownames(lr_result_bal) <- NULL
-
-colnames(lr_result_bal) <- lr_result_bal[1,]
-
-lr_result_bal <- lr_result_bal[-1, ]
-
-lr_result_bal <- data.frame(Model = "Logistic Regression -  Balanced", lr_result_bal)
-
-lr_result_bal %>% knitr::kable(caption = "Table Metrics Single - Balanced") %>% 
-  kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
-
-```
-
-### Logistic Regression Model - Cross Validation
-
-```{r}
-
-# lr_fit_cv_bal <- lr_wf_bal %>%
-#  fit_resamples(cv, metrics=metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap),
-#                control = control_resamples(save_pred = T))
-
-#saveRDS(lr_fit_cv_bal, "Models/lr_fit_cv_bal.rds")
-
-lr_fit_cv_bal <- readRDS("Models/lr_fit_cv_bal.rds")
-
-lr_result_cv_bal <- data.frame(t(collect_metrics(lr_fit_cv_bal) %>% select(.metric, mean)))
-
-rownames(lr_result_cv_bal) <- NULL
-
-colnames(lr_result_cv_bal) <- lr_result_cv_bal[1,]
-
-lr_result_cv_bal <- lr_result_cv_bal[-1, ]
-
-lr_result_cv_bal <- data.frame(Model = "Logistic Regression - Balanced", lr_result_cv_bal)
-
-lr_result_cv_bal %>% knitr::kable(caption = "Table Metrics Cross Validation - Balanced") %>% 
-  kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
-
-```
-
-### Logistic Regression Model - Confusion Matrix
-
-```{r}
-
- lr_fit_cv_bal %>%
-   unnest(.predictions) %>%
-   conf_mat(exited, .pred_class) %>% 
-  autoplot(type = "heatmap")
-
-```
-
-### Random Forest Model
-
-```{r}
-
-# Creating model 
-rf_bal <- rand_forest(trees = 500) %>%
-  set_engine("ranger") %>% 
-  set_mode("classification")
-
-# Trainnig model
-#rf_fit_bal <- rf_bal %>% fit(exited ~., data= train_data_balanced)
-
-#saveRDS(rf_fit_bal, "Models/rf_fit_bal.rds")
-
-rf_fit_bal <- readRDS("Models/rf_fit_bal.rds")
-
-rf_wf_bal <- workflow() %>% 
-  add_model(rf_bal) %>% 
-  add_recipe(rec_balanced)
-
-# rf_res_bal <-
-#   last_fit(
-#     rf_wf_bal,
-#     split = data_split,
-#     metrics = metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap)
-#   )
-
-#saveRDS(rf_res_bal,"Models/rf_res_bal.rds")
-
-rf_res_bal <- readRDS("Models/rf_res_bal.rds")
-
-rf_result_bal <- data.frame(t(collect_metrics(rf_res_bal) %>% select(.metric, .estimate)))
-
-rownames(rf_result_bal) <- NULL
-
-colnames(rf_result_bal) <- rf_result_bal[1,]
-
-rf_result_bal <- rf_result_bal[-1, ] 
-
-rf_result_bal <- data.frame(Model = "Random forest -  Balanced", rf_result_bal)
-
-rf_result_bal %>% knitr::kable(caption = "Table Metrics Single - Balanced") %>% 
-  kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
-
-```
-
-### Random Forest Model - Cross Validation
-
-```{r}
-
-# rf_fit_cv_bal <- rf_wf_bal %>%
-#   fit_resamples(cv, metrics=metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap),
-#                 control = control_resamples(save_pred = T))
-
-#saveRDS(rf_fit_cv_bal, "Models/rf_fit_cv_bal.rds")
-
-rf_fit_cv_bal <- readRDS("Models/rf_fit_cv_bal.rds")
-
-rf_result_cv_bal <- data.frame(t(collect_metrics(rf_fit_cv_bal) %>% select(.metric, mean)))
-
-rownames(rf_result_cv_bal) <- NULL
-
-colnames(rf_result_cv_bal) <- rf_result_cv_bal[1,]
-
-rf_result_cv_bal <- rf_result_cv_bal[-1, ]
-
-rf_result_cv_bal <- data.frame(Model = "Random Forest -  Balanced", rf_result_cv_bal)
-
-rf_result_cv_bal %>% knitr::kable(caption = "Table Metrics Cross Validation - Balanced") %>% 
-  kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
-
-```
-
-### Random Forest Model - Confusion Matrix
-
-```{r}
-
-rf_fit_cv_bal %>%
-   unnest(.predictions) %>%
-   conf_mat(exited, .pred_class) %>% 
-  autoplot(type = "heatmap", label.color  = "blue")
-
-```
-
-
-### Xgboost Model - Imbalanced
+### Xgboost Model 
 
 ```{r}
 
@@ -1550,39 +1436,44 @@ xg <- boost_tree(trees = 500) %>%
   set_mode("classification")
 
 # Trainnig model
-#xg_fit <- xg %>% fit(exited ~., data= train_data_imbalanced)
+#xg_fit <- xg %>% fit(exited ~., data= train_data_balanced)
 
 #saveRDS(xg_fit, "Models/xg_fit.rds")
 
 xg_fit <- readRDS("Models/xg_fit.rds")
 
-xg_wf <- workflow() %>% 
-  add_model(xg) %>% 
-  add_recipe(rec_imbalanced)
+xg_pred <- xg_fit %>% 
+  predict(test_data_balanced) %>%
+  bind_cols(test_data_balanced$exited) %>%
+  rename(predictions = ".pred_class", actual = "...2")
 
-# xg_res <-
-#   last_fit(
-#     xg_wf,
-#     split = data_split,
-#     metrics = metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap)
-#   )
 
-#saveRDS(xg_res,"Models/xg_res.rds")
+xg_pred_prob <- xg_fit %>% 
+  predict(test_data_balanced, type = "prob") %>%
+  bind_cols(test_data_balanced$exited) %>%
+  rename( actual = "...3")
 
-xg_res <- readRDS("Models/xg_res.rds")
+m_eval <- metric_set(accuracy,precision,recall, f_meas,mcc,kap)
 
-xg_result <- data.frame(t(collect_metrics(xg_res) %>% select(.metric, .estimate)))
+xg_result <- m_eval(bind_cols(test_data_balanced, xg_pred), truth = actual, estimate = predictions) 
+
+xg_roc <- roc_auc(bind_cols(test_data_balanced, xg_pred_prob), truth = actual, .pred_1)
+
+xg_result <- bind_rows(xg_result, xg_roc)
+
+xg_result <- data.frame(t(xg_result %>% select(.metric, .estimate)))
 
 rownames(xg_result) <- NULL
 
 colnames(xg_result) <- xg_result[1,]
 
-xg_result <- xg_result[-1, ] 
+xg_result <- xg_result[-1, ]
 
-xg_result <- data.frame(Model = "Xgboost Model - Imbalanced", xg_result)
+xg_result <- data.frame(Model = "Xgboost Model", xg_result)
 
-xg_result %>% knitr::kable(caption = "Table Metrics Single - Imbalanced") %>% 
+xg_result %>% knitr::kable(caption = "Table Metrics Single") %>%
   kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
+
 
 ```
 
@@ -1590,15 +1481,22 @@ xg_result %>% knitr::kable(caption = "Table Metrics Single - Imbalanced") %>%
 
 ```{r}
 
-# xg_fit_cv <- xg_wf %>%
-#   fit_resamples(cv, metrics=metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap),
-#                 control = control_resamples(save_pred = T))
+# Create Workflow
+xg_wf <- 
+  workflow() %>% 
+  add_model(xg) %>% 
+  add_recipe(rec_balanced)
 
-#saveRDS(xg_fit_cv, "Models/xg_fit_cv.rds")
+# Evaluate Cross validation
+# xg_cv <-
+#   fit_resamples(xg_wf,
+#                 resamples = cv,metrics = metric_set(accuracy,precision,recall, f_meas,mcc,kap, roc_auc), control = control_resamples(save_pred = TRUE))
 
-xg_fit_cv <- readRDS("Models/xg_fit_cv.rds")
+#saveRDS(xg_cv, "Models/xg_cv.rds")
 
-xg_result_cv <- data.frame(t(collect_metrics(xg_fit_cv) %>% select(.metric, mean)))
+xg_cv <- readRDS("Models/xg_cv.rds")
+
+xg_result_cv <- data.frame(t(collect_metrics(xg_cv) %>% select(.metric, mean)))
 
 rownames(xg_result_cv) <- NULL
 
@@ -1606,119 +1504,63 @@ colnames(xg_result_cv) <- xg_result_cv[1,]
 
 xg_result_cv <- xg_result_cv[-1, ]
 
-xg_result_cv <- data.frame(Model = "Xgboost Model -  Imbalanced", xg_result_cv)
+xg_result_cv <- data.frame(Model = "Xgboost Model", xg_result_cv)
 
-xg_result_cv %>% knitr::kable(caption = "Table Metrics Cross Validation - Imbalanced") %>% 
+xg_result_cv %>% knitr::kable(caption = "Table Metrics Cross Validation") %>%
   kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
 
 ```
 
-## Xgboost Model Model - Confusion Matrix
+## Xgboost Model - Confusion Matrix
 
 ```{r}
 
- xg_fit_cv %>%
+ xg_cv %>%
    unnest(.predictions) %>%
    conf_mat(exited, .pred_class) %>% 
   autoplot(type = "heatmap")
 
 ```
 
-
-
-### Xgboost Model - Balanced
-
-```{r}
-
-# Creating model 
-xg_bal <- boost_tree(trees = 500) %>%
-  set_engine("xgboost") %>% 
-  set_mode("classification")
-
-# Trainnig model
-#xg_fit_bal <- xg_bal %>% fit(exited ~., data= train_data_balanced)
-
-#saveRDS(xg_fit, "Models/xg_fit_bal.rds")
-
-xg_fit_bal <- readRDS("Models/xg_fit_bal.rds")
-
-xg_wf_bal <- workflow() %>% 
-  add_model(xg_bal) %>% 
-  add_recipe(rec_balanced)
-
-# xg_res_bal <-
-#   last_fit(
-#     xg_wf_bal,
-#     split = data_split,
-#     metrics = metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap)
-#   )
-
-#saveRDS(xg_res_bal,"Models/xg_res_bal.rds")
-
-xg_res_bal <- readRDS("Models/xg_res_bal.rds")
-
-xg_result_bal <- data.frame(t(collect_metrics(xg_res_bal) %>% select(.metric, .estimate)))
-
-rownames(xg_result_bal) <- NULL
-
-colnames(xg_result_bal) <- xg_result_bal[1,]
-
-xg_result_bal <- xg_result_bal[-1, ] 
-
-xg_result_bal <- data.frame(Model = "Xgboost Model -  Balanced", xg_result_bal)
-
-xg_result_bal %>% knitr::kable(caption = "Table Metrics Single - Balanced") %>% 
-  kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
-
-```
-
-## Xgboost Model - Cross Validation
-
-```{r}
-
-# xg_fit_cv_bal <- xg_wf_bal %>%
-#   fit_resamples(cv, metrics=metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap),
-#                 control = control_resamples(save_pred = T))
-
-#saveRDS(xg_fit_cv_bal, "Models/xg_fit_cv_bal.rds")
-
-xg_fit_cv_bal <- readRDS("Models/xg_fit_cv_bal.rds")
-
-xg_result_cv_bal <- data.frame(t(collect_metrics(xg_fit_cv_bal) %>% select(.metric, mean)))
-
-rownames(xg_result_cv_bal) <- NULL
-
-colnames(xg_result_cv_bal) <- xg_result_cv_bal[1,]
-
-xg_result_cv_bal <- xg_result_cv_bal[-1, ]
-
-xg_result_cv_bal <- data.frame(Model = "Xgboost Model - Balanced", xg_result_cv_bal)
-
-xg_result_cv_bal %>% knitr::kable(caption = "Table Metrics Cross Validation - Balanced") %>% 
-  kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
-
-```
-
-## Xgboost Model Model - Confusion Matrix
-
-```{r}
-
- xg_fit_cv_bal %>%
-   unnest(.predictions) %>%
-   conf_mat(exited, .pred_class) %>% 
-  autoplot(type = "heatmap")
-
-```
 
 ### Comparing performance on Models with Imbalanced data
 
 ```{r}
 
-bind_rows(lr_result_cv, lr_result_cv_bal, rf_result_cv, rf_result_cv_bal, xg_result_cv, xg_result_cv_bal) %>% 
-  knitr::kable(caption = "Performance Comparison Table for Models - Imbalanced and Balanced") %>% 
+bind_rows(lr_result_cv,  rf_result_cv,  xg_result_cv, ) %>%
+  knitr::kable(caption = "Performance Comparison Table for Models") %>%
   kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
 
 ```
+
+
+```{r, fig.height=8}
+
+lr_cv %>%
+  unnest(.predictions) %>%
+  mutate(model = "logistic regression") %>%
+  bind_rows(rf_cv %>%
+    unnest(.predictions) %>%
+    mutate(model = "random forest")) %>%
+  bind_rows(xg_cv %>%
+    unnest(.predictions) %>%
+    mutate(model = "xgboost")) %>%
+  group_by(model) %>%
+  roc_curve(exited, .pred_1) %>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity, color = model)) +
+  geom_line(size = 1) +
+  geom_abline(
+    lty = 2, alpha = 0.5,
+    color = "gray50",
+    size = 1.2
+  )
+  
+
+```
+
+
+
+
 
 Looking at the accuracy we could say that the models with unbalanced data have better performance, this is not true, looking at the confusion matrix we see that the models are more correct when the class is "no" because it corresponds to approximately 80% of the database, considering that accuracy = number of correct predictions / total cases, unbalanced data have a high bias in the model, to evaluate the best model I will choose the Kappa or Cohen Kappa metrics is a statistical metric used to measure the models ’performance for items qualitative (categorical).  
 It is a more useful measure to use in problems that have an imbalance in the classes (for example, 70-30 divided for classes 0 and 1 and you can achieve 70% accuracy by predicting that all instances are for class 0).  
@@ -1732,6 +1574,8 @@ Sendo assim podemos verificar que o melhor conjunto de dados a ser ultiizado ser
 
 I will use the Random Forest model for this problem, as it had the best performance.  
 Vou usar o modelo Random Forest para este problema , pois ele teve a melhor performance.  
+
+
 
 
 # Hyperparameter Fine tuning
@@ -1755,6 +1599,7 @@ rf_wf_spec <- workflow() %>%
 
 ```
 
+
 ```{r}
 
 # set.seed(345)
@@ -1762,7 +1607,7 @@ rf_wf_spec <- workflow() %>%
 # doParallel::registerDoParallel()
 # 
 # tune_result <- tune_grid(
-#   
+# 
 #   rf_wf_spec,
 #   resamples = cv,
 #   grid = 10, metrics=metric_set(accuracy, precision ,recall, f_meas , roc_auc ,mcc, kap),
@@ -1772,7 +1617,6 @@ rf_wf_spec <- workflow() %>%
 #saveRDS(tune_result, "hyperparameters/tune_result.rds")
 
 tune_result <- readRDS("hyperparameters/tune_result.rds")
-
 
 ```
 
@@ -1841,4 +1685,38 @@ final_res %>% knitr::kable(caption = "Table Metrics Random Forest - Final Model"
   kableExtra::kable_styling(full_width = F, bootstrap_options = c("hover", "condesend"),html_font = "Cambria")
 
 ```
+
+## Final Model Random Forest - Confusion Matrix
+
+```{r}
+
+final_res_pred <- readRDS("Models/final_res.rds")
+
+final_res_pred <- final_res_pred %>% collect_predictions()
+
+final_res_pred %>% 
+  conf_mat(truth = exited, estimate = .pred_class) %>% 
+  autoplot(type ="heatmap")
+
+```
+
+
+Model performance and results report with the following topics:    
+  
+  - What is the company's current turnover rate? 
+  - Qual é a taxa de churn atual da empresa?: 20%
+  
+  - How does the churn rate vary by month?  
+  - Como a taxa de churn varia por mês?  
+  
+  - How does the model perform to label customers as churns? 
+  - Qual é o desempenho do modelo para prever os clientes como churns?  
+  
+  - - What is the company's revenue, if it prevents customers from entering the contract without canceling it using the model developed?    
+  - Qual é a receita da empresa, se ela evita-se que os clientes entrem no cancela-sem o contrato por meio do modelo desenvolvido?  
+
+
+
+
+
 
